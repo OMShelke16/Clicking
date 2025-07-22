@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catch the Ball</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #87CEEB;
+      overflow: hidden;
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, #87CEEB, #98FB98);
+      border: 5px solid #228B22;
+    }
+    #player {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 40px;
+      background: #FF6B35;
+      border-radius: 20px;
+      border: 3px solid #8B4513;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: left 0.1s ease-out;
+    }
+    #player::before {
+      content: "🏓";
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 20px;
+    }
+    .object {
+      position: absolute;
+      top: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      animation: bounce 0.5s infinite alternate;
+    }
+    @keyframes bounce {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); }
+    }
+    .ball {
+      background: radial-gradient(circle, #FFD700, #FFA500);
+      border: 3px solid #FF8C00;
+    }
+    .bad-ball {
+      background: radial-gradient(circle, #FF4500, #DC143C);
+      border: 3px solid #8B0000;
+    }
+    #score {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #2F4F4F;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 15px;
+      border-radius: 15px;
+      border: 2px solid #228B22;
+    }
+    #timerContainer {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #timerText {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2F4F4F;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px 10px;
+      border-radius: 10px;
+      border: 2px solid #228B22;
+    }
+    #timerBar {
+      height: 25px;
+      background: linear-gradient(to right, #32CD32, #228B22);
+      border-radius: 15px;
+      border: 2px solid #228B22;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transition: width 0.3s ease-out;
+    }
+    #gameTitle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 48px;
+      font-weight: bold;
+      color: #2F4F4F;
+      text-shadow: 2px 2px 4px rgba(255,255,255,0.8);
+      z-index: 10;
+    }
+    #startStopBtn {
+      position: absolute;
+      top: 70px;
+      left: 20px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #2F4F4F;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 20px;
+      border-radius: 15px;
+      border: 2px solid #228B22;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    #startStopBtn:hover {
+      background: rgba(255, 255, 255, 1);
+      transform: scale(1.05);
+    }
+    #startStopBtn:active {
+      transform: scale(0.95);
+    }
+    .paused {
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="gameTitle">🏓 Catch the Ball! 🏓</div>
+    <div id="player"></div>
+    <div id="score">Score: 0</div>
+    <button id="startStopBtn">⏸️ Pause</button>
+    <div id="timerContainer">
+      <div id="timerText">Time: 30s</div>
+      <div id="timerBar" style="width: 150px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const game = document.getElementById("game");
+    const player = document.getElementById("player");
+    const scoreText = document.getElementById("score");
+    const timerBar = document.getElementById("timerBar");
+    const timerText = document.getElementById("timerText");
+    const gameTitle = document.getElementById("gameTitle");
+    const startStopBtn = document.getElementById("startStopBtn");
+
+    let score = 0;
+    let timeLeft = 30; // seconds
+    let playerX = window.innerWidth / 2 - 50;
+    let gameRunning = true;
+    let objectInterval, timerInterval;
+    
+    player.style.left = playerX + "px";
+
+    // Hide title after 3 seconds
+    setTimeout(() => {
+      gameTitle.style.display = "none";
+    }, 3000);
+
+    // Start/Stop button functionality
+    startStopBtn.addEventListener("click", () => {
+      if (gameRunning) {
+        // Pause game
+        gameRunning = false;
+        startStopBtn.textContent = "▶️ Resume";
+        startStopBtn.style.background = "rgba(255, 255, 255, 0.7)";
+        game.classList.add("paused");
+        clearInterval(objectInterval);
+        clearInterval(timerInterval);
+      } else {
+        // Resume game
+        gameRunning = true;
+        startStopBtn.textContent = "⏸️ Pause";
+        startStopBtn.style.background = "rgba(255, 255, 255, 0.9)";
+        game.classList.remove("paused");
+        startGame();
+      }
+    });
+
+    // Move player left and right
+    document.addEventListener("keydown", (e) => {
+      if (!gameRunning) return;
+      
+      if (e.key === "ArrowLeft" && playerX > 0) {
+        playerX -= 25;
+      } else if (e.key === "ArrowRight" && playerX < window.innerWidth - 100) {
+        playerX += 25;
+      }
+      player.style.left = playerX + "px";
+    });
+
+    function createObject() {
+      if (!gameRunning) return;
+      
+      const object = document.createElement("div");
+      object.classList.add("object");
+
+      const isBadBall = Math.random() < 0.25;
+      if (isBadBall) {
+        object.classList.add("bad-ball");
+        object.dataset.type = "bad-ball";
+        object.innerHTML = "💥";
+      } else {
+        object.classList.add("ball");
+        object.dataset.type = "ball";
+        object.innerHTML = "⚽";
+      }
+
+      object.style.left = Math.random() * (window.innerWidth - 40) + "px";
+      game.appendChild(object);
+
+      let objectY = 0;
+      const fallInterval = setInterval(() => {
+        if (!gameRunning) {
+          clearInterval(fallInterval);
+          return;
+        }
+        
+        objectY += 6;
+        object.style.top = objectY + "px";
+
+        const objectX = parseFloat(object.style.left);
+        const playerLeft = playerX;
+        const playerRight = playerX + 100;
+
+        if (objectY >= window.innerHeight - 80) {
+          if (objectX + 40 > playerLeft && objectX < playerRight) {
+            if (object.dataset.type === "bad-ball") {
+              score -= 3;
+            } else {
+              score += 2;
+            }
+            scoreText.textContent = "Score: " + score;
+          }
+          clearInterval(fallInterval);
+          object.remove();
+        }
+      }, 20);
+    }
+
+    function updateTimer() {
+      if (!gameRunning) return;
+      
+      timeLeft--;
+      timerText.textContent = "Time: " + timeLeft + "s";
+      timerBar.style.width = (timeLeft * 5) + "px";
+
+      if (timeLeft <= 0) {
+        location.reload();
+      }
+    }
+
+    setInterval(createObject, 1200);
+    setInterval(updateTimer, 1000);
+  </script>
+</body>
+</html>
